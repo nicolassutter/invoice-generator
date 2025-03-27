@@ -27,6 +27,7 @@
     "@alpinejs/persist": "^3.14.9",
     "@types/alpinejs__persist": "^3.13.4",
     "eslint": "^9.23.0",
-    "prettier": "^3.5.3"
+    "prettier": "^3.5.3",
+    "zod": "^3.24.2"
   }
 }

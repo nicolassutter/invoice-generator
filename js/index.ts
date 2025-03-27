@@ -1,5 +1,6 @@
 import Alpine from "alpinejs";
 import persist from "@alpinejs/persist";
+import { z } from "zod";
 
 Alpine.plugin(persist);
 
@@ -11,25 +12,27 @@ declare global {
 
 window.Alpine = Alpine;
 
-type Item = {
-    Description: string;
-    Quantity: number;
-    Price: number;
-};
+const ItemSchema = z.object({
+    Description: z.string().min(1),
+    Quantity: z.number().min(1),
+    Price: z.number().optional().default(0),
+});
 
-type Invoice = {
-    FromName: string;
-    FromEmail: string;
-    FromAddress: string;
-    ToName: string;
-    ToEmail: string;
-    ToAddress: string;
-    InvoiceNumber?: string;
-    InvoiceDate: string;
-    DueDate: string;
-    Items: Item[];
-    Total: string;
-};
+const InvoiceSchema = z.object({
+    FromName: z.string(),
+    FromEmail: z.string(),
+    FromAddress: z.string(),
+    ToName: z.string(),
+    ToEmail: z.string(),
+    ToAddress: z.string(),
+    InvoiceNumber: z.string().optional(),
+    InvoiceDate: z.string(),
+    DueDate: z.string(),
+    Items: z.array(ItemSchema),
+    Total: z.string(),
+});
+
+type Item = z.infer<typeof ItemSchema>;
 
 Alpine.data("invoiceForm", () => ({
     items: [] as Item[],
@@ -37,7 +40,7 @@ Alpine.data("invoiceForm", () => ({
     addItem() {
         this.items.push({
             Description: "",
-            Quantity: 0,
+            Quantity: 1,
             Price: 0,
         } satisfies Item);
     },
@@ -50,7 +53,7 @@ Alpine.data("invoiceForm", () => ({
         const form = event.target as HTMLFormElement;
         const formData = new FormData(form);
 
-        const invoice: Invoice = {
+        const invoiceData = {
             DueDate: formData.get("dueDate") as string,
             FromAddress: formData.get("fromAddress") as string,
             FromEmail: formData.get("fromEmail") as string,
@@ -68,6 +71,16 @@ Alpine.data("invoiceForm", () => ({
                 .reduce((acc, item) => acc + item.Price * item.Quantity, 0)
                 .toFixed(2),
         };
+
+        const result = InvoiceSchema.safeParse(invoiceData);
+
+        if (!result.success) {
+            console.error(result.error.issues);
+            alert("Validation error");
+            return;
+        }
+
+        const invoice = result.data;
 
         try {
             const res = await fetch("/invoice", {
