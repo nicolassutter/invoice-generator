@@ -1,13 +1,13 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"github.com/a-h/templ"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/adaptor"
 	"github.com/google/uuid"
-	"os"
 )
 
 type Item struct {
@@ -34,7 +34,6 @@ func main() {
 	app := fiber.New()
 
 	app.Static("/assets", "./assets")
-	app.Static("/out", "./out")
 
 	app.Get("/", adaptor.HTTPHandler(templ.Handler(page())))
 
@@ -52,17 +51,9 @@ func main() {
 		uid := uuid.New()
 		invoiceData.InvoiceNumber = uid.String()
 
-		outDir := fmt.Sprintf("out/invoices-%s", uid.String())
-
-		os.MkdirAll(outDir, os.ModePerm)
-		htmlFile, err := os.Create(fmt.Sprintf("%s/index.html", outDir))
-
-		if err != nil {
-			return fiber.NewError(fiber.StatusInternalServerError, "Failed to create output file")
-		}
-		defer htmlFile.Close()
-
-		err = invoice(&invoiceData).Render(context.Background(), htmlFile)
+		var builder bytes.Buffer
+		err := invoice(&invoiceData).Render(context.Background(), &builder)
+		html := builder.Bytes()
 
 		if err != nil {
 			return fiber.NewError(fiber.StatusInternalServerError, "Failed to render invoice")
@@ -73,7 +64,13 @@ func main() {
 		gotenbergUrl := fmt.Sprintf("%s/forms/chromium/convert/html", gotenbergHost)
 
 		agent := fiber.Post(gotenbergUrl)
-		agent.SendFile(htmlFile.Name(), "files").MultipartForm(nil)
+
+		agent.FileData(&fiber.FormFile{
+			Fieldname: "files",
+			Name:      "index.html",
+			Content:   html,
+		}).MultipartForm(nil)
+
 		_, resp, responseErrors := agent.Bytes()
 
 		if len(responseErrors) > 0 {
