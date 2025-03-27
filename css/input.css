@@ -1,0 +1,12 @@
+@import "tailwindcss";
+@source "*.templ";
+
+@plugin "daisyui" {
+  themes:
+    winter --default,
+    night --prefersdark;
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+}
