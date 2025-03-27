@@ -10,6 +10,26 @@ import (
 	"os"
 )
 
+type Item struct {
+	Description string
+	Quantity    int
+	Price       float64
+}
+
+type Invoice struct {
+	FromName      string
+	FromEmail     string
+	FromAddress   string
+	ToName        string
+	ToEmail       string
+	ToAddress     string
+	InvoiceNumber string
+	InvoiceDate   string
+	DueDate       string
+	Items         []Item
+	Total         string
+}
+
 func main() {
 	app := fiber.New()
 
