@@ -150,13 +150,13 @@ templ page() {
 											/>
 											<div class="col-span-2 flex items-center">
 												<span
-													x-text="(item.quantity * item.price || 0).toFixed(2)"
+													x-text="(item.Quantity * item.Price || 0).toFixed(2)"
 													class="text-lg font-semibold"
 												></span>
 											</div>
 											<button
 												type="button"
-												@click="items = items.filter((_, i) => i !== index)"
+												@click="() => removeItem(index)"
 												class="btn btn-circle btn-error btn-sm col-span-1"
 												aria-label="Remove Item"
 											><span aria-hidden="true">x</span></button>

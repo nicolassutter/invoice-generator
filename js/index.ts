@@ -42,6 +42,10 @@ Alpine.data("invoiceForm", () => ({
         } satisfies Item);
     },
 
+    removeItem(index: number) {
+        this.items.splice(index, 1);
+    },
+
     async submitInvoice(event: Event) {
         const form = event.target as HTMLFormElement;
         const formData = new FormData(form);
