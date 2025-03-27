@@ -2,30 +2,32 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"github.com/a-h/templ"
+	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/adaptor"
 	"github.com/google/uuid"
-	"log"
-	"net/http"
 	"os"
 	"resty.dev/v3"
 )
 
 func main() {
-	http.Handle("/", templ.Handler(page()))
+	app := fiber.New()
+
+	app.Static("/assets", "./assets")
+	app.Static("/out", "./out")
+
+	app.Get("/", adaptor.HTTPHandler(templ.Handler(page())))
 
 	// Handle the "/invoice" endpoint to process invoice data.
 	// It decodes the JSON request body into an Invoice struct,
 	// generates a unique identifier for the invoice, creates an HTML file,
 	// and renders the invoice content into the file.
-	http.HandleFunc("/invoice", func(w http.ResponseWriter, r *http.Request) {
+	app.Post("/invoice", func(c *fiber.Ctx) error {
 		var invoiceData Invoice
-		err := json.NewDecoder(r.Body).Decode(&invoiceData)
 
-		if err != nil {
-			http.Error(w, "Invalid invoice data", http.StatusBadRequest)
-			return
+		if err := c.BodyParser(&invoiceData); err != nil {
+			return err
 		}
 
 		uid := uuid.New()
@@ -37,44 +39,34 @@ func main() {
 		htmlFile, err := os.Create(fmt.Sprintf("%s/index.html", outDir))
 
 		if err != nil {
-			log.Fatalf("failed to create output file: %v", err)
+			return fiber.NewError(fiber.StatusInternalServerError, "Failed to create output file")
 		}
 		defer htmlFile.Close()
 
 		err = invoice(&invoiceData).Render(context.Background(), htmlFile)
 
 		if err != nil {
-			log.Fatalf("failed to render invoice: %v", err)
+			return fiber.NewError(fiber.StatusInternalServerError, "Failed to render invoice")
 		}
 
 		// make the call to Gotenberg API to convert the HTML file to PDF
 		client := resty.New()
 		defer client.Close()
 
-		pdfName := fmt.Sprintf("%s/invoice.pdf", outDir)
 		gotenbergHost := "http://localhost:9000"
 
-		_, err = client.R().
+		resp, err := client.R().
 			SetFile("files", htmlFile.Name()).
-			SetSaveResponse(true).
-			SetOutputFileName(pdfName).
 			Post(fmt.Sprintf("%s/forms/chromium/convert/html", gotenbergHost))
 
 		if err != nil {
-			log.Fatalf("failed to convert HTML to PDF: %v", err)
+			return fiber.NewError(fiber.StatusInternalServerError, "Failed to convert HTML to PDF")
 		}
 
-		// return http file location
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]string{"file": pdfName})
+		pdfBytes := resp.Bytes()
+		c.Response().Header.Set("Content-Type", "application/pdf")
+		return c.Send(pdfBytes)
 	})
 
-	assets := http.FileServer(http.Dir("./assets"))
-	http.Handle("/assets/", http.StripPrefix("/assets/", assets))
-
-	out := http.FileServer(http.Dir("./out"))
-	http.Handle("/out/", http.StripPrefix("/out/", out))
-
-	fmt.Println("Listening on :3000")
-	http.ListenAndServe(":3000", nil)
+	app.Listen(":3000")
 }
