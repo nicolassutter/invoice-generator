@@ -8,7 +8,6 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/adaptor"
 	"github.com/google/uuid"
 	"os"
-	"resty.dev/v3"
 )
 
 func main() {
@@ -50,22 +49,19 @@ func main() {
 		}
 
 		// make the call to Gotenberg API to convert the HTML file to PDF
-		client := resty.New()
-		defer client.Close()
-
 		gotenbergHost := "http://localhost:9000"
+		gotenbergUrl := fmt.Sprintf("%s/forms/chromium/convert/html", gotenbergHost)
 
-		resp, err := client.R().
-			SetFile("files", htmlFile.Name()).
-			Post(fmt.Sprintf("%s/forms/chromium/convert/html", gotenbergHost))
+		agent := fiber.Post(gotenbergUrl)
+		agent.SendFile(htmlFile.Name(), "files").MultipartForm(nil)
+		_, resp, responseErrors := agent.Bytes()
 
-		if err != nil {
+		if len(responseErrors) > 0 {
 			return fiber.NewError(fiber.StatusInternalServerError, "Failed to convert HTML to PDF")
 		}
 
-		pdfBytes := resp.Bytes()
 		c.Response().Header.Set("Content-Type", "application/pdf")
-		return c.Send(pdfBytes)
+		return c.Send(resp)
 	})
 
 	app.Listen(":3000")
